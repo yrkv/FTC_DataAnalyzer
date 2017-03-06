@@ -18,9 +18,9 @@ public class MouseMotion implements MouseMotionListener {
 	public void mouseDragged(MouseEvent e) {
 		mouse.x = e.getX();
 		mouse.y = e.getY();
-		if (mouse.main.menuState == MenuState.GRAPHS && mouse.main.graphTool.currentTool == GraphTool.VIEW) {
-			mouse.main.yShift -= (lastY - e.getY()) / mouse.main.zoom;
-			mouse.main.xShift -= (lastX - e.getX()) / mouse.main.zoom;
+		if (mouse.main.menuState == MenuState.GRAPH && mouse.main.graphTool.currentTool == GraphTool.VIEW) {
+			mouse.main.yShift -= (lastY - e.getY());
+			mouse.main.xShift -= (lastX - e.getX());
 			lastX = e.getX();
 			lastY = e.getY();
 		}

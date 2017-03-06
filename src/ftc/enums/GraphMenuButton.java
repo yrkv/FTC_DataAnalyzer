@@ -1,8 +1,10 @@
 package ftc.enums;
 
 public enum GraphMenuButton {
-	MEASURE_TIME (0, 0, 100, 50),
-	SLOPE_CALC (100, 0, 100, 50);
+	Measure_Time (0, 0, 100, 50),
+	Slope_Calculator (100, 0, 100, 50),
+	Encoder_Position(-100, 0, 100, 50),
+	Speed(-200, 0, 100, 50);
 
 	public int x, y, width, height;
 
