@@ -26,7 +26,7 @@ public class MouseEvents implements MouseListener {
 			mouse.main.menuState = clicked.menuState;
 		}
 		if (mouse.main.menuState == MenuState.MAIN_MENU) {
-			if (e.getX() - Main.leftPanelWidth > 0 && e.getX() - Main.leftPanelWidth < 100 && e.getY() < mouse.main.listOfFiles.length * 20) {
+			if (e.getX() - mouse.main.leftPanelWidth > 0 && e.getX() - mouse.main.leftPanelWidth < 100 && e.getY() < mouse.main.listOfFiles.length * 20) {
 				try {
 					mouse.main.readFile(mouse.main.listOfFiles[e.getY() / 20]);
 				} catch (FileNotFoundException e1) {
@@ -35,7 +35,7 @@ public class MouseEvents implements MouseListener {
 			}
 		}
 		if (mouse.main.menuState == MenuState.GRAPH) {
-			GraphTool tool = mouse.main.graphTool;
+			GraphTool tool = mouse.main.graph.tool;
 			GraphMenuButton graphClicked = whichGraphButton(e.getX(), e.getY());
 			if (graphClicked != null) { // The user clicked on a graph menu button
 				switch (graphClicked) {
@@ -46,11 +46,27 @@ public class MouseEvents implements MouseListener {
 						tool.currentTool = GraphTool.SLOPE_CALC_START;
 						break;
 					case Encoder_Position:
-						mouse.main.graphState = GraphState.Time_Enc;
+						mouse.main.graph.state = GraphState.Time_Enc;
 						break;
 					case Speed:
-						mouse.main.graphState = GraphState.Time_Speed;
+						mouse.main.graph.state = GraphState.Time_Speed;
 						break;
+					case Measure_X:
+						tool.currentTool = GraphTool.MEASURE_X;
+						break;
+					case Measure_Y:
+						tool.currentTool = GraphTool.MEASURE_Y;
+						break;
+					case Measure_Gyro:
+						tool.currentTool = GraphTool.GYRO;
+				}
+			} else if (e.getX() < mouse.main.leftPanelWidth) { // the user clicked in the left panel
+				if (mouse.main.data.size() > 0)
+				for (int i = 0; i < mouse.main.data.get(0).motorPositions.length; i++) {
+					int y = mouse.main.frame.getHeight() - i*20 - 20;
+					if (mouse.x <= mouse.main.leftPanelWidth && mouse.y >= y && mouse.y <= y+20) {
+						mouse.main.motorsActive[i] = !mouse.main.motorsActive[i];
+					}
 				}
 			} else if (whichButton(e.getX(), e.getY()) == null) { // the user clicked inside the main graphing window
 				switch (tool.currentTool) {
@@ -65,6 +81,15 @@ public class MouseEvents implements MouseListener {
 						break;
 					case GraphTool.SLOPE_CALC_END:
 						tool.endSlopeCalc(e.getX(), e.getY());
+						break;
+					case GraphTool.MEASURE_X:
+						tool.endMeasureX(e.getX());
+						break;
+					case GraphTool.MEASURE_Y:
+						tool.endMeasureY(e.getY());
+						break;
+					case GraphTool.GYRO:
+						tool.endGyro(e.getX());
 						break;
 				}
 			}
@@ -85,8 +110,9 @@ public class MouseEvents implements MouseListener {
 	@Nullable
 	private GraphMenuButton whichGraphButton(int x, int y) {
 		for (GraphMenuButton button: GraphMenuButton.values()) {
-			if (x > button.x + Main.leftPanelWidth && x < button.x + Main.leftPanelWidth + button.width
-					&& y > button.y + mouse.main.frame.getHeight() - Main.bottomPanelHeight && y < button.y + mouse.main.frame.getHeight() - Main.bottomPanelHeight + button.height) {
+			if (x > button.x + mouse.main.leftPanelWidth && x < button.x + mouse.main.leftPanelWidth + button.width
+					&& y > button.y + mouse.main.frame.getHeight() - mouse.main.bottomPanelHeight &&
+					y < button.y + mouse.main.frame.getHeight() - mouse.main.bottomPanelHeight + button.height) {
 				return  button;
 			}
 		}

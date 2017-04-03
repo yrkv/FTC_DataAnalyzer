@@ -16,12 +16,12 @@ public class MouseWheel implements MouseWheelListener{
 
 	@Override
 	public void mouseWheelMoved(MouseWheelEvent e) {
-		if (mouse.main.menuState == MenuState.GRAPH && mouse.main.graphTool.currentTool == GraphTool.VIEW) {
+		if (mouse.main.menuState == MenuState.GRAPH && mouse.main.graph.tool.currentTool == GraphTool.VIEW) {
 			totalScroll -= e.getUnitsToScroll() / 3;
 			mouse.main.tempZoom = totalScroll;
 		}
 		if (mouse.main.menuState == MenuState.OVERVIEW) {
-			mouse.main.overviewYOffset -= e.getUnitsToScroll() / 3 * 5;
+			mouse.main.overview.yOffset -= e.getUnitsToScroll() / 3 * 5;
 //			if (mouse.main.overviewYOffset < 0) mouse.main.overviewYOffset = 0;
 		}
 	}

@@ -3,6 +3,10 @@ package ftc;
 import ftc.enums.*;
 import ftc.enums.Button;
 import ftc.mouse.Mouse;
+import ftc.tab.Graph;
+import ftc.tab.MainMenu;
+import ftc.tab.Map;
+import ftc.tab.Overview;
 
 import java.util.ArrayList;
 
@@ -11,56 +15,44 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.util.Comparator;
 import java.util.Scanner;
 
 public class Main extends JFrame {
+	public Graph graph = new Graph(this);
+	private MainMenu mainMenu = new MainMenu(this);
+	public Map map = new Map(this);
+	public Overview overview = new Overview(this);
+
 	public JFrame frame = new JFrame();
-	private String name = "";
-	private double initVoltage;
-	private ArrayList<State> data = new ArrayList<>();
-	private double[][] motorSpeeds;
-	private double[][] motorSpeedsSmooth;
-	private int motorSpeedsSmoothness = 20;
+	public ArrayList<State> data = new ArrayList<>();
+	public double[][] motorSpeeds;
+	public double[][] motorSpeedsSmooth;
+	private int motorSpeedsSmoothness = 1;
 	public MenuState menuState = MenuState.MAIN_MENU;
-	private Mouse mouse = new Mouse(this);
+	public Mouse mouse = new Mouse(this);
 	private File folder = new File("res/records");
 	public File[] listOfFiles = folder.listFiles();
-	private String[] motorNames = {};
+	public boolean[] motorsActive;
 	private String[] colorSensorNames = {};
-	private Color[] motorColors = {
-			new Color(255, 0, 0),
-			new Color(0, 255, 0),
-			new Color(0, 0, 255),
-			new Color(0, 255, 255),
-			new Color(255, 0, 255),
-			new Color(255, 120, 0),
-			new Color(0, 160, 160),
-			new Color(0, 0, 0),
-	};
-	private Color toolColor1 = new Color(230, 230, 0);
-	private Color toolColor2 = new Color(255, 255, 0, 50);
 
-	private double startTime;
+	public double minTime;
+	public double maxTime;
+	public int minEncPos;
+	public int maxEncPos;
 
-	private double minTime;
-	private double maxTime;
-	private int minEncPos;
-	private int maxEncPos;
+	public ArrayList<String> pathReconstruction;
 
-	private ArrayList<String> pathReconstruction;
+	public int leftPanelWidth = 100;
+	public int bottomPanelHeight = 50;
 
-	public GraphTool graphTool = new GraphTool(this);
-	public GraphState graphState = GraphState.Time_Enc;
-
-	public static int leftPanelWidth = 100;
-	public static int bottomPanelHeight = 50;
-
-	public int overviewYOffset = 0;
 	public int xShift = 100, yShift = -50;
 	public double zoom = 1;
 	public double fakeZoom = 0;
 	public double tempZoom = 0;
 	private long lastZoom = 0;
+
+	public double yScale = 100;
 
 	public static void main(String[] args) throws IOException {
 		Main main = new Main();
@@ -79,23 +71,26 @@ public class Main extends JFrame {
 		data = new ArrayList<>();
 		Scanner f = new Scanner(file);
 
-		initVoltage = Double.parseDouble(f.nextLine());
-		motorNames = f.nextLine().split(",");
+//		initVoltage = Double.parseDouble(f.nextLine());
+		overview.initVoltage = Double.parseDouble(f.nextLine());
+		graph.motorNames = f.nextLine().split(",");
 		colorSensorNames = f.nextLine().split(",");
-		name = file.getName();
-
+		mainMenu.currentFile = file.getName();
+		motorsActive = new boolean[graph.motorNames.length];
+		for (int i = 0; i < motorsActive.length; i++)
+			motorsActive[i] = true;
 
 		while (f.hasNextLine()) {
 			f.nextLine();
 			data.add(new State(f.nextLine(), f.nextLine(), f.nextLine(), f.nextLine()));
 		}
 
-		startTime = data.get(0).time;
+		minTime = data.get(0).time;
 
-		motorSpeeds = new double[motorNames.length][data.size() - 1];
-		motorSpeedsSmooth = new double[motorNames.length][data.size() - motorSpeedsSmoothness - 1];
+		motorSpeeds = new double[graph.motorNames.length][data.size() - 1];
+		motorSpeedsSmooth = new double[graph.motorNames.length][data.size() - motorSpeedsSmoothness - 1];
 
-		for (int j = 0; j < motorNames.length; j++) {
+		for (int j = 0; j < graph.motorNames.length; j++) {
 			for (int i = 0; i < data.size() - 1; i++) {
 				motorSpeeds[j][i] = (data.get(i+1).motorPositions[j] - data.get(i).motorPositions[j])
 						/ (data.get(i+1).time - data.get(i).time);
@@ -158,7 +153,7 @@ public class Main extends JFrame {
 					totalDist += dist;
 				if (last == 1) {
 					if (Math.abs(lastDir - dir) > 0)
-						pathReconstruction.add(String.format("turn to %.2f %.2f", (dir-90), data.get(i).time-startTime));
+						pathReconstruction.add(String.format("turn to %.2f %.2f", (dir-90), data.get(i).time- minTime));
 					lastDir = dir;
 				}
 
@@ -171,7 +166,7 @@ public class Main extends JFrame {
 
 				if (last == 0) {
 					if (totalDist > 0.1) {
-						pathReconstruction.add(String.format("move %.2f %.2f", totalDist * 12.4, data.get(i).time-startTime));
+						pathReconstruction.add(String.format("move %.2f %.2f", totalDist * 12.4, data.get(i).time- minTime));
 						totalDist = 0;
 					}
 				}
@@ -199,6 +194,15 @@ public class Main extends JFrame {
 	}
 
 	private void frame() {
+		BufferedImage img = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+		Graphics imgG = img.getGraphics();
+
+		imgG.setColor(Color.BLACK);
+		imgG.drawLine(5, 0, 5, 10);
+		imgG.drawLine(0, 5, 10, 5);
+
+		frame.setCursor(frame.getToolkit().createCustomCursor(img, new Point(5, 5), "null"));
+
 		frame.setUndecorated(true);
 		frame.setBackground(Color.WHITE);
 		frame.setVisible(true);
@@ -212,7 +216,6 @@ public class Main extends JFrame {
 		{
 			public void paintComponent(Graphics g)
 			{
-
 				try {
 					render(g);
 				} catch (IOException e) {
@@ -227,213 +230,21 @@ public class Main extends JFrame {
 	private void render(Graphics g) throws IOException {
 		switch (menuState) {
 			case MAIN_MENU:
-				drawMainMenu(g);
+				mainMenu.render(g);
 				break;
 			case GRAPH:
-				drawGraphPowers(g);
-				drawGrid(g);
-				switch (graphState) {
-					case Time_Enc:
-						drawGraphsTE(g);
-						break;
-					case Time_Speed:
-						drawGraphsTS(g);
-						break;
-				}
+				graph.render(g);
 				break;
 			case MAP:
-				drawMap(g);
+				map.render(g);
 				break;
 			case OVERVIEW:
-				drawDataView(g);
+				overview.render(g);
 				break;
 		}
 		drawMenu(g);
 		if (menuState == MenuState.GRAPH)
-			drawGraphMenu(g);
-	}
-
-	private void drawMainMenu(Graphics g) {
-		for (int i = 0; i < listOfFiles.length; i++) {
-
-			String name = listOfFiles[i].getName();
-			if (this.name.equals(name))
-				g.setColor(Color.LIGHT_GRAY);
-			else
-				g.setColor(Color.WHITE);
-			g.fillRect(leftPanelWidth, 20*i, 100, 20);
-			g.setColor(Color.BLACK);
-			g.drawRect(leftPanelWidth, 20*i, 100, 20);
-			g.drawString(name, leftPanelWidth + 5, 20*i + 15);
-		}
-	}
-
-	private void drawGraphPowers(Graphics g) {
-		if (data.size() > 0) {
-			for (int j = 0; j < data.get(0).motorPositions.length; j++) {
-				int[] xPoints = new int[data.size()];
-				int[] yPoints = new int[data.size()];
-
-				for (int i = 0; i < data.size(); i++) {
-					xPoints[i] = timeToX(data.get(i).time);
-					yPoints[i] = frame.getHeight() - bottomPanelHeight - 25 + (int) (25 * data.get(i).motorPowers[j]);
-					xPoints[i] = (int) (xPoints[i] * zoom) + xShift;
-				}
-
-				g.setColor(new Color(motorColors[j].getRed(), motorColors[j].getGreen(), motorColors[j].getBlue(), 100));
-				g.fillPolygon(xPoints, yPoints, data.size());
-			}
-		}
-	}
-
-	private void drawGraphsTE(Graphics g) {
-		if (data.size() > 0) {
-			for (int j = 0; j < data.get(0).motorPositions.length; j++) {
-				int[] xPoints = new int[data.size()];
-				int[] yPoints = new int[data.size()];
-
-				for (int i = 0; i < data.size(); i++) {
-					xPoints[i] = timeToX(data.get(i).time);
-					yPoints[i] = encToY(data.get(i).motorPositions[j]);
-
-					xPoints[i] = (int) (xPoints[i] * zoom) + xShift;
-					yPoints[i] = (int) (yPoints[i] * zoom) + yShift;
-				}
-
-				g.setColor(motorColors[j]);
-				g.drawPolyline(xPoints, yPoints, data.size());
-			}
-		}
-	}
-
-	private void drawGraphsTS(Graphics g) {
-		double yScale = 100;
-
-		if (data.size() > 0) {
-			for (int j = 0; j < data.get(0).motorPositions.length; j++) {
-				int[] xPoints = new int[motorSpeedsSmooth[j].length];
-				int[] yPoints = new int[motorSpeedsSmooth[j].length];
-
-				for (int i = 0; i < motorSpeedsSmooth[j].length; i++) {
-					xPoints[i] = timeToX(data.get(i).time);
-					yPoints[i] = encToY(motorSpeedsSmooth[j][i]*yScale);
-					xPoints[i] = (int) (xPoints[i] * zoom) + xShift;
-					yPoints[i] = (int) (yPoints[i] * zoom) + yShift;
-				}
-
-				g.setColor(motorColors[j]);
-				g.drawPolyline(xPoints, yPoints, motorSpeedsSmooth[j].length);
-			}
-		}
-	}
-
-	private void drawGraphMenu(Graphics g) {
-		g.setColor(Color.WHITE);
-		g.fillRect(leftPanelWidth + 1, 0, frame.getWidth() - leftPanelWidth - 1, 20);
-		g.setColor(Color.BLACK);
-		g.drawLine(leftPanelWidth, 20, frame.getWidth(), 20);
-
-		drawGraphKey(g);
-		drawGraphTool(g);
-
-		g.setColor(Color.WHITE);
-		g.fillRect(leftPanelWidth, frame.getHeight() - bottomPanelHeight, frame.getWidth() - leftPanelWidth, 50);
-		g.setColor(Color.BLACK);
-		g.drawLine(leftPanelWidth, frame.getHeight() - bottomPanelHeight, frame.getWidth(), frame.getHeight() - bottomPanelHeight);
-
-		GraphMenuButton[] graphMenuButtons = GraphMenuButton.values();
-		for (GraphMenuButton button: graphMenuButtons) {
-			if (button.x < 0) button.x = frame.getWidth() + button.x - leftPanelWidth;
-			g.drawRect(button.x + leftPanelWidth, button.y + frame.getHeight() - bottomPanelHeight, button.width, button.height);
-			g.drawString(button.name().replace('_', ' '), button.x + leftPanelWidth + 5, button.y + frame.getHeight() - 15);
-		}
-	}
-
-	private void drawGraphKey(Graphics g) {
-		for (int i = 0; i < motorNames.length; i++) {
-			g.setColor(motorColors[i]);
-			g.fillRect(5, frame.getHeight() - i*20 - 15, 10, 10);
-			g.setColor(Color.BLACK);
-			g.drawString(motorNames[i].substring(1, motorNames[i].length() - 1), 17, frame.getHeight() - i * 20 - 5);
-		}
-	}
-
-	private void drawMap(Graphics g) throws IOException {
-		BufferedImage img = ImageIO.read(new File("res/image00.png"));
-
-		int size = (frame.getWidth() - leftPanelWidth) > frame.getHeight() ? frame.getHeight() : (frame.getWidth() - leftPanelWidth);
-		g.drawImage(img, leftPanelWidth, 0, size, size, null);
-
-		double countsPerInch = 270 / Math.PI;
-		double pixelsToInch = size / 144.0;
-
-		double dir = 90;
-
-		int leftWheelIndex = 2, rightWheelIndex = 5;
-
-		double[] xpoints = new double[data.size()];
-		double[] ypoints = new double[data.size()];
-
-		xpoints[0] = 84 * pixelsToInch;
-		ypoints[0] = (144 - 3.5) * pixelsToInch;
-
-		for (int i = 0; i < data.size()-1; i++) {
-
-			dir = 90 + data.get(i).navXHeading;
-			if  ((motorSpeeds[leftWheelIndex][i] > 0 && motorSpeeds[rightWheelIndex][i] > 0)
-					|| (motorSpeeds[leftWheelIndex][i] < 0 && motorSpeeds[rightWheelIndex][i] < 0)) { // robot is moving forward
-				double dist = pixelsToInch * (motorSpeeds[leftWheelIndex][i] + motorSpeeds[rightWheelIndex][i]) / 2 / countsPerInch * 12.4;
-				xpoints[i+1] = xpoints[i] - Math.cos(dir * Math.PI / 180) * dist;
-				ypoints[i+1] = ypoints[i] - Math.sin(dir * Math.PI / 180) * dist;
-
-				if (xpoints[i+1] > pixelsToInch * 129.5)
-					xpoints[i+1] = pixelsToInch * 129.5;
-				if (xpoints[i+1] < 3.5)
-					xpoints[i+1] = 3.5;
-			} else {
-				xpoints[i+1] = xpoints[i];
-				ypoints[i+1] = ypoints[i];
-			}
-
-		}
-
-		int[] xPoints = new int[data.size()];
-		int[] yPoints = new int[data.size()];
-		for (int i = 0; i <  data.size(); i++) {
-			xPoints[i] = (int) xpoints[i] + leftPanelWidth;
-			yPoints[i] = (int) ypoints[i];
-		}
-
-
-		Graphics2D g2 = (Graphics2D) g;
-		g2.setStroke(new BasicStroke(3));
-
-		g.setColor(toolColor1);
-		g.drawPolyline(xPoints, yPoints, data.size());
-		g2.setStroke(new BasicStroke());
-	}
-
-	private void drawDataView(Graphics g) {
-		g.drawString("Initial Voltage: " + initVoltage, leftPanelWidth + 5, 15 + overviewYOffset);
-		g.drawRect(leftPanelWidth, overviewYOffset, 120, 20);
-		int height = 20;
-
-		for (int i = 0; i < pathReconstruction.size(); i++) {
-			String[] splitString = pathReconstruction.get(i).split(" ");
-			String string = splitString[0] + " " + splitString[1];
-			if (splitString.length == 4)
-				string += " " + splitString[2];
-			g.drawString(string, leftPanelWidth + 5, 20 * i + 35 + overviewYOffset);
-			g.drawString(splitString[splitString.length-1], leftPanelWidth + 125, 20 * i + 35 + overviewYOffset);
-			height += 20;
-			g.drawRect(leftPanelWidth, 20*i+20+overviewYOffset, 120, 20);
-		}
-
-//		if (overviewYOffset + height > frame.getHeight()) {
-//			overviewYOffset = frame.getHeight() - height;
-//		}
-
-		g.drawRect(frame.getWidth() - 20, (int)(((double)frame.getHeight()-100)*(overviewYOffset/(frame.getHeight()-height))), 20, 100);
+			graph.drawMenu(g);
 	}
 
 	private void drawMenu(Graphics g) {
@@ -451,70 +262,6 @@ public class Main extends JFrame {
 			g.drawString(button.name().replace('_', ' '), button.x + 5, button.y + button.height - 5);
 		}
 		g.drawLine(leftPanelWidth, 0, leftPanelWidth, frame.getHeight());
-	}
-
-	private void drawGraphTool(Graphics g) {
-		g.drawString(graphTool.text, leftPanelWidth + 5, 15);
-
-		switch (graphTool.currentTool) {
-			case GraphTool.MEASURE_TIME_START:
-				g.setColor(toolColor1);
-				g.drawLine(mouse.x, 0, mouse.x, frame.getHeight());
-				break;
-			case GraphTool.MEASURE_TIME_END:
-				graphTool.calculateMeasureTime(mouse.x);
-				g.setColor(toolColor1);
-				int x1 = graphTool.measureTimeStartX;
-				int x2 = mouse.x;
-				if (x1 > x2) {
-					int temp = x1;
-					x1 = x2;
-					x2 = temp;
-				}
-				g.drawLine(x1, 0, x1, frame.getHeight());
-				g.drawLine(x2, 0, x2, frame.getHeight());
-				g.setColor(toolColor2);
-				g.fillRect(x1, 0, x2 - x1, frame.getHeight());
-				break;
-			case GraphTool.SLOPE_CALC_START:
-				g.setColor(toolColor1);
-				g.fillOval(mouse.x-5, mouse.y-5, 10, 10);
-				break;
-			case GraphTool.SLOPE_CALC_END:
-				graphTool.calculateSlopeCalc(mouse.x, mouse.y);
-				g.setColor(toolColor1);
-				g.fillOval(mouse.x-5, mouse.y-5, 10, 10);
-				g.fillOval(graphTool.slopeCalcStart.x-5, graphTool.slopeCalcStart.y-5, 10, 10);
-				g.setColor(toolColor2);
-				Graphics2D g2 = (Graphics2D) g;
-				g2.setStroke(new BasicStroke(4));
-				g.drawLine(mouse.x, mouse.y, graphTool.slopeCalcStart.x, graphTool.slopeCalcStart.y);
-				g2.setStroke(new BasicStroke());
-				break;
-		}
-	}
-
-	private void drawGrid(Graphics g) {
-		Color gridColor = new Color(0xf0f0f0);
-		for (double x = ((xShift)/zoom % 50) * zoom; x < frame.getWidth(); x += 50 * zoom) {
-			g.setColor(gridColor);
-			g.drawLine((int) x, 0, (int) x, frame.getHeight());
-			g.setColor(Color.BLACK);
-			String str = "" + (XToTime(x) - (int)startTime);
-			g.drawString(str, (int) x + 2, frame.getHeight() - bottomPanelHeight - 52);
-
-		}
-		for (double y = ((yShift)/zoom % 50 - 20) * zoom; y < frame.getHeight(); y += 50 * zoom) {
-			g.setColor(gridColor);
-			g.drawLine(0, (int) y, frame.getWidth(), (int) y);
-			g.setColor(Color.BLACK);
-			String str = "" + YToEnc(y);
-			g.drawString(str, leftPanelWidth + 52, (int) y - 2);
-		}
-		g.setColor(Color.BLACK);
-
-		g.drawLine(0, frame.getHeight() - bottomPanelHeight - 50, frame.getWidth(), frame.getHeight() - 100);
-		g.drawLine(leftPanelWidth + 50, 0, leftPanelWidth + 50, frame.getHeight());
 	}
 
 	private void changeZoom() {
